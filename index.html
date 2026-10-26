@@ -488,8 +488,8 @@ function parseDue(s){
 function rowsToTasks(values){
   return values.map((r,i)=>{
     const c = k => String((r||[])[k] ?? '').trim();
-    if(!c(3)) return null;
-    return { id:'r'+(i+2), row:i+2, sid:c(0), branchRaw:c(1), branch:c(1)==='SMM'?'smm':'montage', project:c(2), title:c(3), type:c(4), from:c(5),
+    if(!c(3) && !c(4) && !c(6)) return null;
+    return { id:'r'+(i+2), row:i+2, sid:c(0), branchRaw:c(1), branch:c(1)==='SMM'?'smm':'montage', project:c(2), title:c(3) || `${c(4)||'Задача без названия'} (строка ${i+2})`, type:c(4), from:c(5),
       whoRaw:c(6), who:WHO[c(6)]||'me', prio:c(7), dueRaw:c(8), due:parseDue(c(8)), statusRaw:c(9)||'Ждёт', status:ST[c(9)]||'todo',
       progress:Math.max(0,Math.min(100,parseInt(c(10),10)||0)), src:c(11), result:c(12), format:c(13), notes:c(14), blocker:c(15),
       example:/^пример/i.test(c(2)) };
