@@ -435,7 +435,7 @@ function renderBoard(){
     const items = show.filter(t=>t.status===s).sort((a,b)=>(a.due||'9')>(b.due||'9')?1:-1);
     return `<div class="col"><h3><span>${label}</span><span>${items.length}</span></h3>${items.map(t=>{const d=dueInfo(t);
       return `<div class="card" tabindex="0" data-id="${t.id}" style="--c:var(--${t.who})">
-        <div class="proj">${t.sid?`<span style="font-family:var(--f-mono)">${esc(t.sid)}</span> · `:''}${branchOf(t)==='smm'?'<span class="br">SMM</span> ':''}${esc(t.project||'Без проекта')} ${t.example?'<span class="ex">пример</span>':''}</div>
+        <div class="proj">${t.sid?`<span style="font-family:var(--f-mono)">${esc(t.sid)}</span> · `:''}${branchOf(t)==='smm'?'<span class="br">SMM</span> ':''}${esc(t.project||'')} ${t.example?'<span class="ex">пример</span>':''}</div>
         <div class="tt">${esc(t.title)} ${t.prio==='Горит'?'<span class="prio">ГОРИТ</span>':''}</div>
         ${t.blocker?`<div class="blk">Блокер: ${esc(t.blocker)}</div>`:''}
         ${s!=='todo'&&s!=='done'?`<div class="pbar"><i style="width:${t.progress||0}%"></i></div>`:''}
@@ -460,9 +460,9 @@ function openTask(id){
   sh.innerHTML = `<div class="in" role="dialog" aria-modal="true" aria-labelledby="shT">
     <div class="bar" style="justify-content:space-between"><h2 id="shT">${esc(t.sid||'')} ${esc(t.title)}</h2><button id="close" aria-label="Закрыть">✕</button></div>
     <dl class="kv">${rows}</dl>
-    <div class="row"><span class="lbl">Правки с таймкодами</span>${notes.length?notes.map(n=>`<div class="cm">${esc(n)}</div>`).join(''):'<div class="empty">Правок нет.</div>'}</div>
+    <div class="row"><span class="lbl">Правки с таймкодами</span><div class="empty">Смотри в основной таблице.</div></div>
     <div><a class="btn primary" href="${SHEET_URL}" target="_blank" rel="noopener">Изменить в таблице</a></div>
-    <p class="note">Офис только показывает задачи. Статус, прогресс и правки меняются в Google Таблице, строка ${esc(t.row)}.</p>
+    <p class="note">Ссылки на исходники и правки лежат в основной таблице, строка ${esc(t.row)}. Она открыта только для команды.</p>
   </div>`;
   sh.hidden = false;
   const close = ()=>{ sh.hidden=true; sh.innerHTML=''; };
@@ -476,7 +476,7 @@ loop();
 setInterval(()=>{ renderDeadlines(); }, 60000);
 
 /* ===== data: public Google Sheet via gviz JSONP, refreshed every minute ===== */
-const SHEET_ID = "16e-TyCsfDIs6V1PEPcdWJkQosVCYE6ZmqKBcz_ZIsMw";
+const SHEET_ID = "1pDzVud4VfxZXfIFe4yaOicVivBysC3jCWHROhpXAHLc"; // публичная витрина: без ссылок, правок и блокеров
 const WHO = {'Монтажёр':'me','Монтажер':'me','Эльвина':'elvina','Руслан':'ruslan','Данила':'danila','Эльмира':'elmira','Claude':'claude'};
 const ST = {'Ждёт':'todo','Ждет':'todo','В работе':'doing','Правки':'doing','На проверке':'review','Готово':'done'};
 function parseDue(s){
@@ -486,13 +486,13 @@ function parseDue(s){
   return new Date(Date.UTC(+m[3], +m[2]-1, +m[1], h-3, mi)).toISOString(); // время в таблице московское
 }
 function rowsToTasks(values){
+  // витрина: A ID, B Ветка, C Задача, D Тип, E Исполнитель, F Приоритет, G Дедлайн, H Статус, I Прогресс
   return values.map((r,i)=>{
     const c = k => String((r||[])[k] ?? '').trim();
-    if(!c(3) && !c(4) && !c(6)) return null;
-    return { id:'r'+(i+2), row:i+2, sid:c(0), branchRaw:c(1), branch:c(1)==='SMM'?'smm':'montage', project:c(2), title:c(3) || `${c(4)||'Задача без названия'} (строка ${i+2})`, type:c(4), from:c(5),
-      whoRaw:c(6), who:WHO[c(6)]||'me', prio:c(7), dueRaw:c(8), due:parseDue(c(8)), statusRaw:c(9)||'Ждёт', status:ST[c(9)]||'todo',
-      progress:Math.max(0,Math.min(100,parseInt(c(10),10)||0)), src:c(11), result:c(12), format:c(13), notes:c(14), blocker:c(15),
-      example:/^пример/i.test(c(2)) };
+    if(!c(2) && !c(3) && !c(4)) return null;
+    return { id:'r'+(i+2), row:i+2, sid:c(0), branchRaw:c(1), branch:c(1)==='SMM'?'smm':'montage', project:'', title:c(2) || `${c(3)||'Задача без названия'} (строка ${i+2})`,
+      type:c(3), whoRaw:c(4), who:WHO[c(4)]||'me', prio:c(5), dueRaw:c(6), due:parseDue(c(6)), statusRaw:c(7)||'Ждёт', status:ST[c(7)]||'todo',
+      progress:Math.max(0,Math.min(100,parseInt(c(8),10)||0)) };
   }).filter(Boolean);
 }
 const fmtTime = d => d.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
@@ -502,7 +502,7 @@ window.__onSheet = function(resp){
   clearTimeout(pending);
   document.querySelectorAll('script[data-sheet]').forEach(s=>s.remove());
   if(!resp || resp.status==='error'){
-    setStatus(loadedOnce ? 'Не удалось обновить, показаны последние данные.' : 'Таблица закрыта. Владелец должен открыть её на просмотр по ссылке.');
+    setStatus(loadedOnce ? 'Не удалось обновить, показаны последние данные.' : 'Витрина закрыта. Владелец должен открыть её на просмотр по ссылке.');
     return;
   }
   const rows = (resp.table && resp.table.rows || []).map(r => (r.c||[]).map(c => c==null ? '' : (c.f!=null ? c.f : (c.v ?? ''))));
@@ -512,7 +512,7 @@ window.__onSheet = function(resp){
 function loadSheet(){
   const s = document.createElement('script');
   s.dataset.sheet = '1';
-  s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:__onSheet&sheet=${encodeURIComponent('Задачи')}&headers=1&range=A1:P500&_=${Date.now()}`;
+  s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:__onSheet&sheet=${encodeURIComponent('Витрина')}&headers=1&range=A1:I500&_=${Date.now()}`;
   s.onerror = ()=>{ setStatus(loadedOnce ? 'Нет связи с таблицей, показаны последние данные.' : 'Не получилось загрузить таблицу. Проверь, что она открыта на просмотр по ссылке.'); s.remove(); };
   pending = setTimeout(()=>{ if(!loadedOnce) setStatus('Таблица не отвечает. Проверь, что она открыта на просмотр по ссылке.'); }, 15000);
   document.head.appendChild(s);
