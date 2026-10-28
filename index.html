@@ -70,7 +70,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 .bub .bt{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bub .pb{height:3px;background:#E3E0D6;margin-top:3px}.bub .pb i{display:block;height:100%;background:var(--c)}
 .bub.idle{opacity:.85}
-.bub[data-k=me]{transform:translate(-88%,-100%)}.bub[data-k=me]::after{left:88%}
+.bub[data-k=me]{transform:translate(-80%,-100%)}.bub[data-k=me]::after{left:80%}
 .bub[data-k=claude]{transform:translate(-12%,-100%)}.bub[data-k=claude]::after{left:12%}.bub.sel{outline:2px solid var(--c);outline-offset:1px}
 .zone{position:absolute;transform:translate(-50%,-50%);font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#fff;
   background:rgba(20,18,30,.55);padding:1px 6px;border-radius:3px;white-space:nowrap}
@@ -306,13 +306,25 @@ function targets(){
   DESKS.forEach(k=>{
     const a=actors[k]; let spot;
     const di=idle.indexOf(k);
-    if(di<0){ const [dx,dy]=DESKPOS[k]; spot={x:dx+17,y:dy+21,z:4,sit:true,face:'back',desk:true}; }
+    if(di<0 && k==='me') spot=STALL_SEAT;
+    else if(di<0){ const [dx,dy]=DESKPOS[k]; spot={x:dx+17,y:dy+21,z:4,sit:true,face:'back',desk:true}; }
     else spot=IDLE[(di+phase)%IDLE.length];
     if(a.spot && a.spot.x===spot.x && a.spot.y===spot.y) { a.spot=spot; return; }
     a.spot=spot;
     if(!a.placed || RM){ a.x=spot.x; a.y=spot.y; a.path=[]; a.placed=true; }
-    else a.path=route([a.x,a.y],[spot.x,spot.y]);
+    else a.path=stallRoute([a.x,a.y],[spot.x,spot.y]);
   });
+}
+// кабинка Никиты: вход через дверь справа, выход тем же путём
+const STALL={x:84,y:8,w:36,d:38}, STALL_DOOR=[128,30];
+const STALL_SEAT={x:98,y:17,z:6,sit:true,face:'front',desk:true,laptop:true};
+const inStall=p=>p[0]>=STALL.x-2&&p[0]<=STALL.x+STALL.w&&p[1]>=STALL.y&&p[1]<=STALL.y+STALL.d;
+function stallRoute(from,to){
+  const a=inStall(from), b=inStall(to);
+  if(a&&b) return [to];
+  if(b) return [...route(from,STALL_DOOR),[STALL_SEAT.x,STALL_DOOR[1]],to];
+  if(a) return [[from[0],STALL_DOOR[1]],STALL_DOOR,...route(STALL_DOOR,to)];
+  return route(from,to);
 }
 setInterval(()=>{ phase++; targets(); }, 18000);
 
@@ -328,6 +340,9 @@ function floor(){
   // rug
   poly([P(160,26,0),P(204,26,0),P(204,46,0),P(160,46,0)],'#BED600');
   poly([P(163,29,0),P(201,29,0),P(201,43,0),P(163,43,0)],'#9DB000');
+  // кафель кабинки
+  for(let i=0;i<6;i++)for(let j=0;j<6;j++){ const x=STALL.x+i*6, y=STALL.y+j*6.33;
+    poly([P(x,y),P(x+6,y),P(x+6,y+6.33),P(x,y+6.33)],(i+j)%2?'#F4F6F7':'#CFE3EA'); }
 }
 function walls(){
   const h=new Date().getHours(), night=h>=20||h<7;
@@ -368,7 +383,7 @@ function walls(){
   // kitchen cabinets on left wall
   box(0,100,34,7,48,13,tri('#F2EEE6'));
 }
-function personSprite(sx,sy,k,sit,face,walk){
+function personSprite(sx,sy,k,sit,face,walk,laptop){
   const c=COL[k], hair=PEOPLE[k].hair, skin='#EBC29C';
   const bob = walk && !RM ? (Math.floor(frame/6)%2) : 0;
   rect(sx-5,sy-1,10,2,'rgba(0,0,0,.22)');
@@ -384,6 +399,12 @@ function personSprite(sx,sy,k,sit,face,walk){
   if(face==='back'){ rect(sx-3,top-16,6,5,hair); }
   else { rect(sx-3,top-16,6,2,hair); rect(sx-3,top-14,1,2,hair); rect(sx+2,top-14,1,2,hair);
     rect(sx-2,top-12,1,1,'#1A1A1A'); rect(sx+1,top-12,1,1,'#1A1A1A'); }
+  if(laptop){ // ноутбук на коленях, экран светит в лицо
+    g.globalAlpha=.25; rect(sx-3,top-13,6,4,'#BED600'); g.globalAlpha=1;
+    rect(sx-6,top-1,12,2,'#8A8D93'); rect(sx-5,top-7,10,6,'#C9CBD1'); rect(sx-5,top-7,10,1,'#E2E4E8');
+    rect(sx-1,top-5,2,2,'#BED600');
+    if(!RM && frame%24<12) rect(sx+6,top-3,1,1,'#FFFFFF');
+  }
   return [sx, top-17];
 }
 function botSprite(sx,sy){
@@ -403,7 +424,7 @@ function drawScene(){
   const items=[];
   const add=(k,fn)=>items.push({k,fn});
   // desks
-  DESKS.forEach(p=>{ const [x,y]=DESKPOS[p]; const {pick}=deskTask(p); const on=pick&&pick.status==='doing';
+  DESKS.filter(p=>p!=='me').forEach(p=>{ const [x,y]=DESKPOS[p]; const {pick}=deskTask(p); const on=pick&&pick.status==='doing';
     add(x+y+24,()=>{ box(x,y,0,34,14,10,tri('#C99A66')); box(x+2,y+2,0,2,10,10,tri('#8A6440'));
       box(x+11,y+3,10,12,3,11,tri('#3B3F4E'));
       faceY(x+12,x+22,y+6,12,20, on ? (frame%50<25?'#7FD3E0':'#6CC4D3') : '#4A5064');
@@ -444,16 +465,41 @@ function drawScene(){
       if(d<0.8){ a.x=t[0]; a.y=t[1]; a.path.shift(); } else { a.x+=dx/d*0.8; a.y+=dy/d*0.8; } }
     const walking=a.path.length>0, s=a.spot;
     const z = walking?0:s.z, sit=!walking&&s.sit, face=walking?'front':s.face;
-    add(a.x+a.y+(sit?22:4),()=>{ const [sx,sy]=P(a.x,a.y,z); headPos[k]=personSprite(sx,sy,k,sit,face,walking); });
+    add(a.x+a.y+(sit?22:4),()=>{ const [sx,sy]=P(a.x,a.y,z); headPos[k]=personSprite(sx,sy,k,sit,face,walking,!walking&&s.laptop); });
   });
-  // claude bot hovering by "me" desk
-  { const [x,y]=DESKPOS.me; add(x+y+60,()=>{ const [sx,sy]=P(x+40,y+14,10); const h=botSprite(sx,sy); headPos.claude=[h[0],h[1]-4]; }); }
+  // кабинка Никиты
+  { const {x,y,w,d}=STALL, H=23, Z=3, wall=tri('#E9EBEE'), trim=tri('#9DB000'), leg=tri('#8A8D93');
+    add(60,()=>{ // задняя и левая перегородки
+      box(x,y-2,Z,w,2,H,wall); box(x-2,y-2,Z,2,d+2,H,wall);
+      box(x,y-2,Z+H,w,2,1,trim); box(x-2,y-2,Z+H,2,d+2,1,trim);
+      for(const lx of [x+2,x+w-3]) box(lx,y-1,0,1,1,Z,leg);
+      for(const ly of [y+4,y+d-4]) box(x-1,ly,0,1,1,Z,leg);
+      // держатель с туалетной бумагой
+      box(x,y+20,13,2,1,1,tri('#B8B8C4')); box(x,y+18,9,3,5,4,tri('#FFFFFF'));
+      // освежитель воздуха
+      box(x+28,y,17,3,1,4,tri('#BED600'));
+    });
+    add(110,()=>{ // унитаз
+      box(x+1,y,8,12,4,12,tri('#FFFFFF')); box(x+2,y+1,20,10,2,1,tri('#E3E6EA')); box(x+9,y+1,17,2,1,1,tri('#B8BCC4'));
+      box(x+10,y+5,0,8,8,6,tri('#F2F4F6')); box(x+9,y+4,6,10,10,1,tri('#FFFFFF'));
+      box(x+11,y+6,7,6,6,0.5,tri('#DDE2E8'));
+    });
+    add(145,()=>{ box(x+11,y+12,0,6,1,5,tri('#FFFFFF')); }); // край унитаза из-под ног
+    add(175,()=>{ // правая перегородка с приоткрытой дверью
+      box(x+w,y-2,Z,2,10,H,wall); box(x+w,y-2,Z+H,2,10,1,trim); box(x+w,y+6,0,1,1,Z,leg);
+      box(x+w,y+30,Z,2,10,H,wall); box(x+w,y+30,Z+H,2,10,1,trim); box(x+w,y+38,0,1,1,Z,leg);
+      box(x+w+2,y+28,Z,9,2,H-2,tri('#DFE2E6')); box(x+w+9,y+27,12,1,1,3,tri('#8A8D93'));
+      // табличка на двери
+      faceY(x+w+3,x+w+8,y+30,18,22,'#4D4E53'); faceY(x+w+4,x+w+7,y+30,19,21,'#BED600');
+    });
+  }
+  add(400,()=>{ const [sx,sy]=P(STALL.x+STALL.w-2,STALL.y-4,24); const h=botSprite(sx,sy); headPos.claude=[h[0],h[1]-4]; });
   items.sort((a,b)=>a.k-b.k).forEach(i=>i.fn());
 }
 
 /* overlay: bubbles + zone labels */
 function zoneLabels(){
-  return [['Рабочие столы',[70,104,0]],['Лаундж',[200,54,0]],['Кухня',[30,166,0]],['SMM',[200,166,0]]]
+  return [['Рабочие столы',[70,104,0]],['Кабинка монтажёра',[128,48,0]],['Лаундж',[200,54,0]],['Кухня',[30,166,0]],['SMM',[200,166,0]]]
     .map(([t,p])=>{const [x,y]=P(...p);return `<div class="zone" style="left:${x/CW*100}%;top:${y/CH*100}%">${t}</div>`}).join('');
 }
 function renderOffice(){
