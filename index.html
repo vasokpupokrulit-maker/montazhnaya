@@ -338,6 +338,28 @@ function walls(){
   for(const x of [34,84]){ faceY(x,x+34,0,24,52,'#4D4E53'); faceY(x+2,x+32,0,26,50,night?'#1D2347':'#9FD8F0');
     if(!night){ faceY(x+4,x+12,0,40,46,'#FFFFFF'); } else rect(...P(x+24,0,46),1,1,'#FFF6C0');
     faceY(x+16,x+18,0,26,50,'#4D4E53'); }
+  // самолётик S7 за окнами: каждые 2 минуты по часам (у всех одновременно) и один раз через 3 с после открытия
+  {
+    const FLY = 7000, EVERY = 120000, now = Date.now();
+    let t = now % EVERY;
+    if (t > FLY && window.__firstFly && now >= window.__firstFly && now - window.__firstFly < FLY) t = now - window.__firstFly;
+    if (!RM && t <= FLY) {
+      const k = t / FLY, px = -16 + k * 150, pz = 36 + Math.sin(k * Math.PI) * 6;
+      g.save(); g.beginPath();
+      for (const x of [34,84]) { const a=P(x+2,0,26), b=P(x+32,0,26), c=P(x+32,0,50), d=P(x+2,0,50);
+        g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0],c[1]); g.lineTo(d[0],d[1]); g.closePath(); }
+      g.clip();
+      const [sx, sy] = P(px, 0, pz);
+      g.globalAlpha = night ? .35 : .7; rect(sx-26, sy-13, 20, 1, '#FFFFFF'); rect(sx-40, sy-20, 12, 1, '#FFFFFF'); g.globalAlpha = 1;
+      // корпус, нос, хвост, крыло, иллюминаторы
+      rect(sx-8, sy-3, 15, 4, '#BED600'); rect(sx+7, sy-2, 2, 3, '#9DB000'); rect(sx+9, sy-1, 1, 2, '#9DB000');
+      rect(sx-9, sy-7, 3, 5, '#9DB000'); rect(sx-2, sy+1, 6, 2, '#8FA000'); rect(sx-1, sy-5, 4, 2, '#8FA000');
+      for (let w = 0; w < 4; w++) rect(sx - 4 + w*3, sy-2, 1, 1, '#4D4E53');
+      if (frame % 30 < 15) rect(sx-9, sy-8, 1, 1, '#E5413A');
+      g.restore();
+      for (const x of [34,84]) faceY(x+16, x+18, 0, 26, 50, '#4D4E53');
+    }
+  }
   // ON AIR
   const live=tasks.some(t=>t.status==='doing');
   faceY(140,166,0,44,54,'#2A2236'); faceY(142,164,0,46,52, live ? (frame%60<45?'#E5413A':'#B8302B') : '#5B3A3A');
@@ -515,6 +537,7 @@ function openTask(id){
 }
 
 render();
+window.__firstFly = Date.now() + 3000;
 loop();
 setInterval(()=>{ renderDeadlines(); }, 60000);
 
