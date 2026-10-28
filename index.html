@@ -309,6 +309,7 @@ function targets(){
     if(di<0 && k==='me') spot=STALL_SEAT;
     else if(di<0 && BAR_SEAT[k]) spot=BAR_SEAT[k];
     else if(di<0){ const [dx,dy]=DESKPOS[k]; spot={x:dx+17,y:dy+21,z:4,sit:true,face:'back',desk:true}; }
+    else if(k==='ruslan') spot=BOX_SPOT;
     else spot=IDLE[(di+phase)%IDLE.length];
     if(a.spot && a.spot.x===spot.x && a.spot.y===spot.y) { a.spot=spot; return; }
     a.spot=spot;
@@ -319,6 +320,9 @@ function targets(){
 // кабинка Никиты: вход через дверь справа, выход тем же путём
 // барная стойка вдоль левой стены: бармен между полками и стойкой, команда на табуретах
 const BAR={x:22,y:18,d:76};
+// боксёрская груша в углу лаунжа: Руслан бьёт её, когда отдыхает
+const BAG={x:226,y:62}, BOX_SPOT={x:210,y:62,z:0,sit:false,face:'front',boxing:true,label:'бьёт грушу'};
+const punchPhase=()=> RM ? 0 : Math.floor(frame/7)%4;
 const BAR_SEAT={danila:{x:38,y:22,z:8,sit:true,face:'back',desk:true},
                 ruslan:{x:38,y:45,z:8,sit:true,face:'back',desk:true},
                 elvina:{x:38,y:68,z:8,sit:true,face:'back',desk:true}};
@@ -390,7 +394,7 @@ function walls(){
   // kitchen cabinets on left wall
   box(0,100,34,7,48,13,tri('#F2EEE6'));
 }
-function personSprite(sx,sy,k,sit,face,walk,laptop){
+function personSprite(sx,sy,k,sit,face,walk,laptop,boxing){
   const c=COL[k], hair=PEOPLE[k].hair, skin='#EBC29C';
   const bob = walk && !RM ? (Math.floor(frame/6)%2) : 0;
   rect(sx-5,sy-1,10,2,'rgba(0,0,0,.22)');
@@ -401,11 +405,16 @@ function personSprite(sx,sy,k,sit,face,walk,laptop){
   rect(sx-4,top-9,8,9,c); rect(sx-4,top-9,8,1,shade(c,1.15));
   // arms
   const typing = sit && face==='back' && !RM && frame%20<10;
-  rect(sx-5,top-8,1,6,shade(c,.75)); rect(sx+4,top-8-(typing?1:0),1,6,shade(c,.75));
+  if(!boxing){ rect(sx-5,top-8,1,6,shade(c,.75)); rect(sx+4,top-8-(typing?1:0),1,6,shade(c,.75)); }
   rect(sx-3,top-15,6,6,skin);
   if(face==='back'){ rect(sx-3,top-16,6,5,hair); }
   else { rect(sx-3,top-16,6,2,hair); rect(sx-3,top-14,1,2,hair); rect(sx+2,top-14,1,2,hair);
     rect(sx-2,top-12,1,1,'#1A1A1A'); rect(sx+1,top-12,1,1,'#1A1A1A'); }
+  if(boxing){ // перчатки: левая у подбородка, правая бьёт вправо по груше
+    const ph=punchPhase(), ext=[0,6,0,3][ph], jab=[0,0,3,0][ph];
+    rect(sx-5,top-8,2,4,shade(c,.75)); rect(sx-4-jab,top-12,3,3,'#C63A3A'); rect(sx-4-jab,top-12,3,1,'#E46464');
+    rect(sx+3,top-8,2+ext,2,shade(c,.75)); rect(sx+4+ext,top-9,4,4,'#C63A3A'); rect(sx+4+ext,top-9,4,1,'#E46464');
+  }
   if(laptop){ // ноутбук на коленях, экран светит в лицо
     g.globalAlpha=.25; rect(sx-3,top-13,6,4,'#BED600'); g.globalAlpha=1;
     rect(sx-6,top-1,12,2,'#8A8D93'); rect(sx-5,top-7,10,6,'#C9CBD1'); rect(sx-5,top-7,10,1,'#E2E4E8');
@@ -488,6 +497,18 @@ function drawScene(){
     add(x+y+62,()=>{ box(x+40,y+26,0,1,1,18,tri('#2B2F3A')); box(x+38,y+24,18,5,2,8,tri('#1A1A22')); faceY(x+39,x+42,y+26,19,25,'#7FD3E0'); });
     add(x+y+8,()=>{ box(x+44,y+2,0,7,7,7,tri('#B5603C')); const [px,py]=P(x+47,y+5,13); rect(px-4,py-6,8,7,'#3E9452'); rect(px+3,py-3,3,4,'#55A863'); });
   }
+  // боксёрская груша с ковриком
+  add(BAG.x+BAG.y-30,()=>{ poly([P(BAG.x-16,BAG.y-8),P(BAG.x+6,BAG.y-8),P(BAG.x+6,BAG.y+10),P(BAG.x-16,BAG.y+10)],'#2B2C30');
+    poly([P(BAG.x-15,BAG.y-7),P(BAG.x+5,BAG.y-7),P(BAG.x+5,BAG.y+9),P(BAG.x-15,BAG.y+9)],'#3A3B40'); });
+  add(BAG.x+BAG.y+2,()=>{
+    const r=actors.ruslan, hitting = r && r.spot===BOX_SPOT && !r.path.length && punchPhase()===1;
+    const sw = hitting ? 1 : 0, {x,y}=BAG;
+    box(x+9,y+1,0,4,4,1,tri('#2B2C30')); box(x+10,y+2,1,2,2,46,tri('#4D4E53')); box(x+2,y+2,46,10,2,2,tri('#4D4E53'));
+    const [tx,ty]=P(x+3,y+3,46), [bx,by]=P(x+3+sw,y+3,38);
+    g.strokeStyle='#8A8D93'; g.lineWidth=1; g.beginPath(); g.moveTo(tx+.5,ty); g.lineTo(bx+.5,by); g.stroke();
+    box(x+sw,y,12,5,5,26,tri('#B8302B')); box(x+sw,y,30,5,5,2,tri('#2B2C30')); box(x+sw,y,16,5,5,1,tri('#2B2C30'));
+    box(x+sw-1,y-1,38,7,7,1,tri('#8A8D93'));
+  });
   // lounge
   add(150,()=>{ box(140,4,0,7,7,7,tri('#B5603C')); const [px,py]=P(143,7,13); rect(px-4,py-6,8,7,'#3E9452'); rect(px-6,py-2,3,4,'#2F7A40'); rect(px+3,py-3,3,4,'#55A863'); });
   add(185,()=>{ box(158,2,0,48,5,17,tri('#9DB000')); });
@@ -514,7 +535,7 @@ function drawScene(){
       if(d<0.8){ a.x=t[0]; a.y=t[1]; a.path.shift(); } else { a.x+=dx/d*0.8; a.y+=dy/d*0.8; } }
     const walking=a.path.length>0, s=a.spot;
     const z = walking?0:s.z, sit=!walking&&s.sit, face=walking?'front':s.face;
-    add(a.x+a.y+(sit?22:4),()=>{ const [sx,sy]=P(a.x,a.y,z); headPos[k]=personSprite(sx,sy,k,sit,face,walking,!walking&&s.laptop); });
+    add(a.x+a.y+(sit?22:4),()=>{ const [sx,sy]=P(a.x,a.y,z); headPos[k]=personSprite(sx,sy,k,sit,face,walking,!walking&&s.laptop,!walking&&s.boxing); });
   });
   // кабинка Никиты
   { const {x,y,w,d}=STALL, H=23, Z=3, wall=tri('#E9EBEE'), trim=tri('#9DB000'), leg=tri('#8A8D93');
@@ -548,7 +569,7 @@ function drawScene(){
 
 /* overlay: bubbles + zone labels */
 function zoneLabels(){
-  return [['Бар',[52,100,0]],['Кабинка монтажёра',[128,48,0]],['Лаундж',[200,54,0]],['Кухня',[30,166,0]],['SMM',[200,166,0]]]
+  return [['Бар',[52,100,0]],['Кабинка монтажёра',[128,48,0]],['Лаундж',[180,64,0]],['Кухня',[30,166,0]],['SMM',[200,166,0]]]
     .map(([t,p])=>{const [x,y]=P(...p);return `<div class="zone" style="left:${x/CW*100}%;top:${y/CH*100}%">${t}</div>`}).join('');
 }
 function renderOffice(){
