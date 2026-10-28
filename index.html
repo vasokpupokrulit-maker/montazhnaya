@@ -35,9 +35,13 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px}
 h1{font-family:var(--f-display);font-weight:700;font-size:26px;margin:0;letter-spacing:-.01em;text-wrap:balance}
 .sub{color:var(--muted);margin:4px 0 0}
-.tc{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:20px;background:var(--screen);color:var(--screen-on);
-  padding:6px 12px;border-radius:6px;letter-spacing:.04em}
-.tc small{display:block;font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+.beer{display:flex;gap:10px;align-items:center;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0}
+.beer .mug{flex:none;width:22px;height:26px;position:relative}
+.beer .mug::before{content:"";position:absolute;left:0;bottom:0;width:16px;height:20px;border-radius:2px 2px 4px 4px;background:var(--warn)}
+.beer .mug::after{content:"";position:absolute;left:-1px;top:0;width:18px;height:7px;border-radius:5px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line)}
+.beer .h{position:absolute;right:0;top:9px;width:7px;height:11px;border:3px solid var(--warn);border-left:0;border-radius:0 6px 6px 0}
+.beer small{display:block;font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+.beer span{font-size:13px;line-height:1.35}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700}
 select,input,textarea,button{font:inherit;color:inherit}
@@ -140,7 +144,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
     </div>
     <div class="bar">
       <a class="btn primary" href="https://docs.google.com/spreadsheets/d/16e-TyCsfDIs6V1PEPcdWJkQosVCYE6ZmqKBcz_ZIsMw/edit" target="_blank" rel="noopener">+ Задача в таблице</a>
-      <div class="tc"><small>таймкод дня</small><span id="clock">00:00:00:00</span></div>
+      <div class="beer"><div class="mug" aria-hidden="true"><i class="h"></i></div><div><small>Пивная мудрость дня</small><span id="beer"></span></div></div>
     </div>
   </header>
 
@@ -189,10 +193,48 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let tasks = [], db = null, readOnly = false, filter = null;
 
-/* clock as timecode, 25 fps */
-function tick(){ const d=new Date(), p=n=>String(n).padStart(2,'0');
-  $('#clock').textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}:${p(Math.floor(d.getMilliseconds()/40))}`; }
-setInterval(tick, 40); tick();
+/* пивная мудрость дня: одна на календарный день, у всех одинаковая */
+const BEER = [
+  'Пиво не решает проблем. Но и молоко не решает.',
+  'Не откладывай на завтра пиво, которое можно выпить в пятницу.',
+  'Кто рано встаёт, тот первым занимает место у крана.',
+  'Семь раз отмерь, один раз налей. До краёв.',
+  'Пиво без пены что монтаж без склейки: вроде есть, а душа не лежит.',
+  'Тише едешь — холоднее пиво довезёшь.',
+  'Утро вечера мудренее, но вечер пиво разливает.',
+  'Не всё то золото, что блестит. Иногда это светлое нефильтрованное.',
+  'В гостях хорошо, а дома холодильник ближе.',
+  'Без труда не откроешь и бутылку.',
+  'Лучше синица в руке, чем пустая кружка на столе.',
+  'Делу время, а пиву — после рендера.',
+  'Пиво любит тишину, а монтажёр — когда никто не трогает таймлайн.',
+  'Сделал дедлайн — пей смело.',
+  'Не плюй в колодец, вдруг там пивоварня.',
+  'Старый друг лучше новых двух. А старое пиво хуже свежего.',
+  'Кружка пива в обед — до вечера бед нет. Шутка, дедлайн никто не отменял.',
+  'На вкус и цвет пиво разное, а пятница одна.',
+  'Пиво рекой не течёт, пока Руслан не согласовал бюджет.',
+  'Где пена, там и перемены.',
+  'Хлеб всему голова, а пиво — жидкий хлеб. Считай, обед.',
+  'Каков монтаж, таково и пиво после сдачи.',
+  'Работа не волк, в лес не убежит. Пиво тоже, но оно греется.',
+  'Сколько пиву ни стоять, а холоднее без холодильника не станет.',
+  'Не тот пьёт, кто наливает, а тот, кто успел сдать до пятницы.',
+  'Мал рендер, да долог. Как раз на одну кружку.',
+  'Умный в гору не пойдёт, умный в бар пойдёт.',
+  'Кто не рискует, тот пьёт тёмное с тёмным.',
+  'Правки любят счёт, а пиво — дружную компанию.',
+  'Одна голова хорошо, а две кружки лучше.',
+  'Финальный экспорт прошёл без ошибок — значит, сегодня можно.'
+];
+function beerOfDay(){
+  const d = new Date();
+  const day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
+  return BEER[((day * 7) % BEER.length + BEER.length) % BEER.length];
+}
+function showBeer(){ $('#beer').textContent = beerOfDay(); }
+showBeer();
+setInterval(showBeer, 600000); // в полночь сменится сама
 
 /* pipeline legend */
 $('#pipe').innerHTML = [['danila','снял, залил на Яндекс Диск'],['claude','скачал, разложил по планам, сделал просмотровку'],['me','собрал, добавил творчество'],['elvina','проверила, дала правки'],['ruslan','держит дедлайны, сдаёт']]
