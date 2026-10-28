@@ -78,6 +78,12 @@ function testMessage() {
   send_('Проверка связи: бот «Монтажная» на месте 🍺');
 }
 
+/** Если бот раньше где-то использовался с webhook, getUpdates не работает. Эта функция его снимает. */
+function resetWebhook() {
+  const res = UrlFetchApp.fetch(`https://api.telegram.org/bot${token_()}/deleteWebhook`, { muteHttpExceptions: true });
+  console.log(res.getResponseCode() + ' ' + res.getContentText());
+}
+
 /** Отключить уведомления. */
 function stop() {
   ScriptApp.getProjectTriggers().forEach(tr => ScriptApp.deleteTrigger(tr));
@@ -126,7 +132,7 @@ function format_(t) {
 
 function send_(html) {
   const props = PropertiesService.getScriptProperties();
-  const token = props.getProperty('TELEGRAM_TOKEN');
+  const token = token_();
   const chatIds = String(props.getProperty('CHAT_ID') || '').split(',').map(s => s.trim()).filter(Boolean);
   chatIds.forEach(chatId => {
     const res = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -139,10 +145,25 @@ function send_(html) {
   });
 }
 
+/** Токен без пробелов, кавычек, переносов и лишнего текста вокруг. */
+function token_() {
+  const raw = String(PropertiesService.getScriptProperties().getProperty('TELEGRAM_TOKEN') || '');
+  const m = raw.match(/\d{6,}:[A-Za-z0-9_-]{30,}/);
+  if (!m) throw new Error('В TELEGRAM_TOKEN нет токена. Он выглядит как 1234567890:AAH…: цифры, двоеточие, буквы. Скопируй его из сообщения BotFather заново.');
+  return m[0];
+}
+
 function findChatId_() {
-  const token = PropertiesService.getScriptProperties().getProperty('TELEGRAM_TOKEN');
+  const token = token_();
   const res = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/getUpdates`, { muteHttpExceptions: true });
-  if (res.getResponseCode() !== 200) throw new Error('Токен не подходит. Проверь TELEGRAM_TOKEN.');
+  if (res.getResponseCode() !== 200) {
+    let desc = res.getContentText();
+    try { desc = JSON.parse(desc).description || desc; } catch (e) {}
+    const hint = res.getResponseCode() === 401 ? ' Токен неверный или отозван: возьми актуальный у @BotFather (/mybots → бот → API Token).'
+               : res.getResponseCode() === 409 ? ' У бота включён webhook: в @BotFather его можно сбросить, или выполни функцию resetWebhook.'
+               : '';
+    throw new Error('Telegram ответил ' + res.getResponseCode() + ': ' + desc + '.' + hint);
+  }
   const updates = JSON.parse(res.getContentText()).result || [];
   for (let i = updates.length - 1; i >= 0; i--) {
     const m = updates[i].message || updates[i].channel_post || updates[i].my_chat_member;
