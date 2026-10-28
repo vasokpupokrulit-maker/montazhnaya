@@ -172,7 +172,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 
 <script>
 const PEOPLE = {
-  me:     {name:'Ты',      role:'Монтажёр',         hair:'#2b1d14'},
+  me:     {name:'Никита',  role:'Монтажёр',         hair:'#2b1d14'},
   elvina: {name:'Эльвина', role:'Главный редактор', hair:'#4a2418'},
   ruslan: {name:'Руслан',  role:'Продюсер',         hair:'#1d1d1d'},
   danila: {name:'Данила',  role:'Оператор',         hair:'#6b4a2a'},
@@ -477,7 +477,7 @@ setInterval(()=>{ renderDeadlines(); }, 60000);
 
 /* ===== data: public Google Sheet via gviz JSONP, refreshed every minute ===== */
 const SHEET_ID = "1pDzVud4VfxZXfIFe4yaOicVivBysC3jCWHROhpXAHLc"; // публичная витрина: без ссылок, правок и блокеров
-const WHO = {'Монтажёр':'me','Монтажер':'me','Эльвина':'elvina','Руслан':'ruslan','Данила':'danila','Эльмира':'elmira','Claude':'claude'};
+const WHO = {'Никита':'me','Монтажёр':'me','Монтажер':'me','Эльвина':'elvina','Руслан':'ruslan','Данила':'danila','Эльмира':'elmira','Claude':'claude'};
 const ST = {'Ждёт':'todo','Ждет':'todo','В работе':'doing','Правки':'doing','На проверке':'review','Готово':'done'};
 function parseDue(s){
   const m = String(s||'').match(/(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
